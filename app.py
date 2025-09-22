@@ -1,12 +1,13 @@
 from flask import Flask, request, jsonify
-from kucoin.client import Trade
+from kucoin.client import Client
+import os
 
-# 🔑 Suas chaves da KuCoin (pegue em API Management na sua conta)
-API_KEY = "68d1d9e754d53500017378c3"
-API_SECRET = "6a4b8117-f834-40a3-9078-9b39ffe1dcef"
-API_PASSPHRASE = "269826"  # KuCoin pede passphrase também
+# 🔑 Pegando chaves do ambiente (Render → Environment Variables)
+API_KEY = os.getenv("KUCOIN_API_KEY")
+API_SECRET = os.getenv("KUCOIN_SECRET_KEY")
+API_PASSPHRASE = os.getenv("KUCOIN_PASSPHRASE")
 
-client = Trade(key=API_KEY, secret=API_SECRET, passphrase=API_PASSPHRASE)
+client = Client(API_KEY, API_SECRET, API_PASSPHRASE)
 
 app = Flask(__name__)
 
@@ -33,4 +34,6 @@ def order():
         return jsonify({"error": str(e)})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 5000))  # Render escolhe a porta
+    app.run(host="0.0.0.0", port=port)
+
