@@ -1,5 +1,5 @@
 flask==2.3.2
 gunicorn==21.2.0
 python-huobi==0.1.6
-aiohttp
-cryptography
+aiohttp==3.9.5
+cryptography==42.0.8
