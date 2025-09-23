@@ -4,15 +4,16 @@ import os
 
 app = Flask(__name__)
 
-# Pega as chaves do ambiente
 API_KEY = os.getenv("HUOBI_API_KEY")
 API_SECRET = os.getenv("HUOBI_SECRET")
+
 
 @app.route("/")
 def home():
     return "🚀 Servidor Huobi rodando!"
 
-# Rota de teste para verificar se as chaves estão corretas
+
+# 🔍 Rota de teste para verificar se as chaves estão certas
 @app.route("/test")
 def test_credentials():
     try:
@@ -28,6 +29,6 @@ def test_credentials():
             "message": str(e)
         })
 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
