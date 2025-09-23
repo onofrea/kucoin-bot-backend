@@ -1,23 +1,23 @@
 from flask import Flask, jsonify
 from huobi.client.account import AccountClient
+from huobi.constant import *
 import os
 
 app = Flask(__name__)
 
-# 🔑 Pegando as variáveis de ambiente configuradas no Render
 API_KEY = os.getenv("HUOBI_API_KEY")
 API_SECRET = os.getenv("HUOBI_SECRET")
 
 
 @app.route("/")
 def home():
-    return "🚀 Servidor Huobi rodando no Render!"
+    return "🚀 Servidor Huobi rodando!"
 
 
-# 🔍 Rota de teste para validar suas credenciais
 @app.route("/test")
 def test_credentials():
     try:
+        # cria cliente
         account_client = AccountClient(api_key=API_KEY, secret_key=API_SECRET)
         accounts = account_client.get_accounts()
         return jsonify({
