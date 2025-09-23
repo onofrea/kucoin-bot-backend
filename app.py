@@ -4,7 +4,6 @@ import os
 
 app = Flask(__name__)
 
-# 🔑 Pega as chaves do ambiente (Render → Environment)
 API_KEY = os.getenv("HUOBI_API_KEY")
 API_SECRET = os.getenv("HUOBI_SECRET")
 
