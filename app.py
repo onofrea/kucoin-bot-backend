@@ -5,10 +5,11 @@ import os
 
 app = Flask(__name__)
 
-# Pega as chaves do ambiente
+# 🔑 Pega as chaves do ambiente configuradas no Render
 API_KEY = os.getenv("HTX_API_KEY")
 API_SECRET = os.getenv("HTX_SECRET_KEY")
 
+# Cria cliente HTX
 account_client = AccountClient(api_key=API_KEY, secret_key=API_SECRET)
 
 @app.route("/")
@@ -26,6 +27,12 @@ def test_credentials():
     except Exception as e:
         return jsonify({
             "status": "error",
+            "message": str(e)
+        })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+
             "message": str(e)
         })
 
