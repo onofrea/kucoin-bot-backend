@@ -1,4 +1,5 @@
 flask==2.3.2
 gunicorn==21.2.0
-aiohttp==3.9.5
-git+https://github.com/HuobiRDCenter/huobi_Python.git
+python-huobi==0.1.6
+aiohttp
+cryptography
