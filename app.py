@@ -1,6 +1,5 @@
-from flask import Flask, jsonify
+from flask import Flask, request, jsonify
 from huobi.client.account import AccountClient
-from huobi.constant import *
 import os
 
 app = Flask(__name__)
