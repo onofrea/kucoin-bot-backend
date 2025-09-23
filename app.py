@@ -15,4 +15,21 @@ def home():
 
 
 # 🔍 Rota de teste para validar suas credenciais
-@app
+@app.route("/test")
+def test_credentials():
+    try:
+        account_client = AccountClient(api_key=API_KEY, secret_key=API_SECRET)
+        accounts = account_client.get_accounts()
+        return jsonify({
+            "status": "ok",
+            "accounts": [a.__dict__ for a in accounts]
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
