@@ -1,3 +1,4 @@
 flask==2.3.2
 gunicorn==21.2.0
-python-huobi==1.0.11
+git+https://github.com/HuobiRDCenter/huobi_Python.git
+
