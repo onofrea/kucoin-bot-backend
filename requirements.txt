@@ -1,4 +1,3 @@
 flask==2.3.2
 gunicorn==21.2.0
-huobi-client==0.3.1
-
+python-huobi==1.0.11
