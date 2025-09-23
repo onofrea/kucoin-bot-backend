@@ -19,11 +19,12 @@ def home():
 @app.route("/test")
 def test_credentials():
     try:
-        accounts = client.get_account_list()
+        accounts = client.get_accounts()  # ✅ trocamos aqui
         return jsonify({"status": "ok", "accounts": accounts})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
 
