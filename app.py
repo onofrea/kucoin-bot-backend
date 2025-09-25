@@ -1,14 +1,39 @@
 from flask import Flask, request, jsonify
+import json
+import os
 
 app = Flask(__name__)
 
 # -------------------------------
-# DADOS EM MEMÓRIA
+# CONFIGURAÇÃO DE ARQUIVOS
 # -------------------------------
-# Saldo por usuário
-user_balances = {}   # exemplo: {"user123": 100.0}
-# Regras por usuário
-user_rules = {}      # exemplo: {"user123": [{"symbol": "btcusdt", "amount": 0.001, ...}]}
+DATA_FILE = "data.json"
+
+# Estrutura inicial
+data = {
+    "balances": {},  # {"user123": 100.0}
+    "rules": {}      # {"user123": [ {rule1}, {rule2} ]}
+}
+
+
+# -------------------------------
+# FUNÇÕES DE PERSISTÊNCIA
+# -------------------------------
+def load_data():
+    global data
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            try:
+                data = json.load(f)
+            except:
+                data = {"balances": {}, "rules": {}}
+    else:
+        data = {"balances": {}, "rules": {}}
+
+
+def save_data():
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
 
 # -------------------------------
@@ -20,7 +45,7 @@ def balance_route():
     if not user_id:
         return jsonify({"status": "error", "message": "user_id obrigatório"}), 400
 
-    saldo = user_balances.get(user_id, 0.0)
+    saldo = data["balances"].get(user_id, 0.0)
     return jsonify({"status": "ok", "user_id": user_id, "saldo": saldo})
 
 
@@ -29,29 +54,30 @@ def balance_route():
 # -------------------------------
 @app.route("/reset_balance", methods=["POST"])
 def reset_balance():
-    data = request.json or {}
-    user_id = data.get("user_id")
+    payload = request.json or {}
+    user_id = payload.get("user_id")
 
     if not user_id:
         return jsonify({"status": "error", "message": "user_id obrigatório"}), 400
 
-    user_balances[user_id] = 100.0  # saldo inicial padrão
-    user_rules[user_id] = []
+    data["balances"][user_id] = 100.0  # saldo inicial
+    data["rules"][user_id] = []
+    save_data()
 
-    return jsonify({"status": "ok", "user_id": user_id, "saldo": user_balances[user_id]})
+    return jsonify({"status": "ok", "user_id": user_id, "saldo": data["balances"][user_id]})
 
 
 # -------------------------------
-# ROTA: Adicionar regra de trade
+# ROTA: Adicionar regra
 # -------------------------------
 @app.route("/add_rule", methods=["POST"])
 def add_rule():
-    data = request.json or {}
-    user_id = data.get("user_id")
-    symbol = (data.get("symbol") or "").strip()
-    side = (data.get("side") or "buy").strip()
-    target = data.get("target")
-    amount = data.get("amount")
+    payload = request.json or {}
+    user_id = payload.get("user_id")
+    symbol = (payload.get("symbol") or "").strip()
+    side = (payload.get("side") or "buy").strip()
+    target = payload.get("target")
+    amount = payload.get("amount")
 
     if not user_id or not symbol or not target or not amount:
         return jsonify({"status": "error", "message": "Campos obrigatórios (user_id, symbol, target, amount)"}), 400
@@ -65,26 +91,24 @@ def add_rule():
     if amount_val <= 0 or target_val <= 0:
         return jsonify({"status": "error", "message": "Valores devem ser maiores que 0"}), 400
 
-    # Inicializa se não existir
-    if user_id not in user_balances:
-        user_balances[user_id] = 100.0
-        user_rules[user_id] = []
+    # Inicializa usuário se não existir
+    if user_id not in data["balances"]:
+        data["balances"][user_id] = 100.0
+        data["rules"][user_id] = []
 
-    # Cálculo do custo
     custo = amount_val * target_val
 
-    # Verifica saldo
-    if custo > user_balances[user_id]:
+    if custo > data["balances"][user_id]:
         return jsonify({
             "status": "error",
             "message": "Saldo insuficiente",
-            "saldo_atual": user_balances[user_id]
+            "saldo_atual": data["balances"][user_id]
         }), 400
 
     # Desconta saldo
-    user_balances[user_id] -= custo
+    data["balances"][user_id] -= custo
 
-    # Salva regra
+    # Cria regra
     rule = {
         "symbol": symbol,
         "side": side,
@@ -92,18 +116,20 @@ def add_rule():
         "amount": amount_val,
         "custo": custo
     }
-    user_rules[user_id].append(rule)
+    data["rules"][user_id].append(rule)
+
+    save_data()
 
     return jsonify({
         "status": "ok",
         "user_id": user_id,
         "rule": rule,
-        "saldo_restante": user_balances[user_id]
+        "saldo_restante": data["balances"][user_id]
     })
 
 
 # -------------------------------
-# ROTA: Listar regras do usuário
+# ROTA: Listar regras
 # -------------------------------
 @app.route("/rules", methods=["GET"])
 def get_rules():
@@ -114,16 +140,24 @@ def get_rules():
     return jsonify({
         "status": "ok",
         "user_id": user_id,
-        "rules": user_rules.get(user_id, [])
+        "rules": data["rules"].get(user_id, [])
     })
 
 
 # -------------------------------
-# HOME TESTE
+# HOME
 # -------------------------------
 @app.route("/")
 def home():
-    return "🚀 API de Trade Simulada rodando!"
+    return "🚀 API de Trade Simulada com Persistência JSON!"
+
+
+# -------------------------------
+# MAIN
+# -------------------------------
+if __name__ == "__main__":
+    load_data()
+    app.run(host="0.0.0.0", port=5000)
 
 
 # -------------------------------
