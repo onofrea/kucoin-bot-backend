@@ -1,72 +1,51 @@
 from flask import Flask, request, jsonify
-import os
-from huobi.client.account import AccountClient
 
 app = Flask(__name__)
 
-# 🔑 Pega as credenciais do Render (configure nas Variáveis de Ambiente)
-API_KEY = os.getenv("HUOBI_API_KEY")
-API_SECRET = os.getenv("HUOBI_SECRET")
+# Saldos dos usuários
+user_balances = {}  # exemplo: {"user123": 100.0, "user456": 50.0}
 
-# Inicializa o cliente da Huobi
-account_client = AccountClient(api_key=API_KEY, secret_key=API_SECRET)
-
-# Lista de regras em memória
-rules = []
+# Regras por usuário
+user_rules = {}  # exemplo: {"user123": [...], "user456": [...]}
 
 
-def get_account_id():
-    """Pega o primeiro account_id disponível na Huobi"""
-    accounts = account_client.get_accounts()
-    if not accounts:
-        return None
-    return accounts[0].id
-
-
-def get_available_balance(currency):
-    """Retorna o saldo disponível de uma moeda na Huobi"""
-    try:
-        account_id = get_account_id()
-        if not account_id:
-            return 0.0
-
-        balances = account_client.get_balance(account_id).list
-
-        for b in balances:
-            if b.currency.lower() == currency.lower() and b.type == "trade":
-                return float(b.balance)
-        return 0.0
-    except Exception as e:
-        print("Erro ao pegar saldo:", e)
-        return 0.0
-
-
-@app.route("/")
-def home():
-    return "🚀 Servidor Huobi rodando!"
-
-
+# 🔹 Rota para consultar saldo
 @app.route("/balance", methods=["GET"])
 def balance_route():
-    """
-    Exemplo: /balance?currency=usdt
-    """
-    currency = request.args.get("currency", "usdt")
-    available = get_available_balance(currency)
-    return jsonify({"currency": currency, "available": available})
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"status": "error", "message": "user_id obrigatório"}), 400
+
+    saldo = user_balances.get(user_id, 0.0)
+    return jsonify({"status": "ok", "user_id": user_id, "saldo": saldo})
 
 
+# 🔹 Rota para resetar saldo (ex: 100 USD iniciais)
+@app.route("/reset_balance", methods=["POST"])
+def reset_balance():
+    data = request.json or {}
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"status": "error", "message": "user_id obrigatório"}), 400
+
+    user_balances[user_id] = 100.0
+    user_rules[user_id] = []
+    return jsonify({"status": "ok", "user_id": user_id, "saldo": user_balances[user_id]})
+
+
+# 🔹 Adicionar regra (compra/venda simulada)
 @app.route("/add_rule", methods=["POST"])
 def add_rule():
     data = request.json or {}
+    user_id = data.get("user_id")
     symbol = (data.get("symbol") or "").strip()
     side = (data.get("side") or "buy").strip()
     target = data.get("target")
     amount = data.get("amount")
 
-    # 🚨 Valida campos obrigatórios
-    if not symbol or not target or not amount:
-        return jsonify({"status": "error", "message": "Campos obrigatórios"}), 400
+    if not user_id or not symbol or not target or not amount:
+        return jsonify({"status": "error", "message": "Campos obrigatórios (user_id, symbol, target, amount)"}), 400
 
     try:
         amount_val = float(amount)
@@ -77,45 +56,56 @@ def add_rule():
     if amount_val <= 0 or target_val <= 0:
         return jsonify({"status": "error", "message": "Valores devem ser maiores que 0"}), 400
 
-    # 🔎 Verifica saldo antes de aceitar regra
-    symbol_lower = symbol.lower()
-    if side == "buy":
-        # Exemplo: BTCUSDT → quote = usdt
-        if symbol_lower.endswith("usdt"):
-            quote_currency = "usdt"
-        else:
-            return jsonify({"status": "error", "message": "Só suporta par com USDT por enquanto"}), 400
+    # Inicializa saldo do usuário, se não existir
+    if user_id not in user_balances:
+        user_balances[user_id] = 100.0
+        user_rules[user_id] = []
 
-        saldo_disponivel = get_available_balance(quote_currency)
-        custo_estimado = amount_val * target_val
+    # 💰 custo da ordem
+    custo = amount_val * target_val
 
-        if custo_estimado > saldo_disponivel:
-            return jsonify({
-                "status": "error",
-                "message": f"Saldo insuficiente. Necessário {custo_estimado} {quote_currency}, disponível {saldo_disponivel}"
-            }), 400
+    # ⚖️ verificar saldo
+    if custo > user_balances[user_id]:
+        return jsonify({"status": "error", "message": "Saldo insuficiente", "saldo_atual": user_balances[user_id]}), 400
 
-    elif side == "sell":
-        # Exemplo: BTCUSDT → base = btc
-        base_currency = symbol_lower.replace("usdt", "")
-        saldo_disponivel = get_available_balance(base_currency)
+    # 🔻 desconta do saldo
+    user_balances[user_id] -= custo
 
-        if amount_val > saldo_disponivel:
-            return jsonify({
-                "status": "error",
-                "message": f"Saldo insuficiente. Necessário {amount_val} {base_currency}, disponível {saldo_disponivel}"
-            }), 400
+    # ✅ salva a regra
+    rule = {
+        "symbol": symbol,
+        "side": side,
+        "target": target_val,
+        "amount": amount_val,
+        "custo": custo
+    }
+    user_rules[user_id].append(rule)
 
-    # ✅ Se passou nas verificações, salva a regra
-    rule = {"symbol": symbol, "side": side, "target": target_val, "amount": amount_val}
-    rules.append(rule)
-
-    return jsonify({"status": "ok", "rule": rule}), 201
+    return jsonify({
+        "status": "ok",
+        "user_id": user_id,
+        "rule": rule,
+        "saldo_restante": user_balances[user_id]
+    })
 
 
+# 🔹 Consultar regras do usuário
 @app.route("/rules", methods=["GET"])
 def get_rules():
-    return jsonify(rules)
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"status": "error", "message": "user_id obrigatório"}), 400
+
+    return jsonify({
+        "status": "ok",
+        "user_id": user_id,
+        "rules": user_rules.get(user_id, [])
+    })
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+y(rules)
 
 
 if __name__ == "__main__":
