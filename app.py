@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 import math
 import statistics
 
+app = Flask(__name__)
+
 # Huobi SDK imports (assume huobi-client package)
 try:
     from huobi.client.market import MarketClient
